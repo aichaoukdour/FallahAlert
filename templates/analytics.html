@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FellahAlert — Analytics</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    .an-hero {
+      max-width: 1140px;
+      margin: 1.25rem auto 0;
+      padding: 0 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .an-hero a {
+      font-size: .8rem;
+      font-weight: 600;
+      color: var(--green-dark);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: .3rem;
+    }
+    .an-hero a:hover { text-decoration: underline; }
+    .an-hero h2 { font-size: 1rem; color: var(--green-dark); font-weight: 700; }
+
+    .kpi-row {
+      max-width: 1140px;
+      margin: 1rem auto 0;
+      padding: 0 1.5rem;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: .9rem;
+    }
+    .kpi {
+      background: #fff;
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07);
+    }
+    .kpi-val {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--green-dark);
+      line-height: 1;
+    }
+    .kpi-label {
+      font-size: .72rem;
+      color: var(--gray);
+      margin-top: .35rem;
+      font-weight: 500;
+    }
+    .kpi-sub {
+      font-size: .68rem;
+      color: #aaa;
+      margin-top: .15rem;
+    }
+
+    .charts-grid {
+      max-width: 1140px;
+      margin: 1rem auto 2rem;
+      padding: 0 1.5rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .9rem;
+    }
+    .chart-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 1.25rem 1.4rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07);
+    }
+    .chart-card.full { grid-column: 1 / -1; }
+    .chart-card h3 {
+      font-size: .72rem;
+      font-weight: 700;
+      color: var(--gray);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 1rem;
+    }
+    .chart-wrap { position: relative; }
+    .chart-wrap.tall { height: 220px; }
+    .chart-wrap.short { height: 180px; }
+    .chart-wrap.medium { height: 260px; }
+
+    .empty-chart {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 120px;
+      color: var(--gray);
+      font-size: .8rem;
+    }
+
+    .export-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      font-size: .78rem;
+      font-weight: 600;
+      color: #fff;
+      background: var(--green-dark);
+      border: none;
+      padding: .4rem .9rem;
+      border-radius: 20px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background .2s, transform .1s;
+    }
+    .export-btn:hover { background: #1b5e20; transform: translateY(-1px); }
+    .export-btn:active { transform: translateY(0); }
+
+    @media (max-width: 700px) {
+      .kpi-row { grid-template-columns: repeat(2, 1fr); }
+      .charts-grid { grid-template-columns: 1fr; }
+      .chart-card.full { grid-column: 1; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🌾 FellahAlert</h1>
+    <p>Tableau de bord analytique</p>
+  </div>
+  <div style="display:flex;align-items:center;gap:1rem;">
+    <span class="tagline">Gemini AI · NASA POWER · PostgreSQL</span>
+    <a href="/" class="analytics-link">← Dashboard</a>
+  </div>
+</header>
+
+<div class="an-hero">
+  <h2>Vue d'ensemble de l'utilisation</h2>
+  <div style="display:flex;align-items:center;gap:.75rem;">
+    <span id="lastUpdated" style="font-size:.72rem;color:var(--gray);"></span>
+    <a href="/analytics/export" id="exportBtn" class="export-btn" download>
+      ⬇ Exporter CSV
+    </a>
+  </div>
+</div>
+
+<!-- KPI row -->
+<div class="kpi-row" id="kpiRow">
+  <div class="kpi"><div class="kpi-val">—</div><div class="kpi-label">Consultations totales</div></div>
+  <div class="kpi"><div class="kpi-val">—</div><div class="kpi-label">Dernières 24 h</div></div>
+  <div class="kpi"><div class="kpi-val">—</div><div class="kpi-label">Taux succès NASA</div></div>
+  <div class="kpi"><div class="kpi-val">—</div><div class="kpi-label">Langues</div></div>
+</div>
+
+<!-- Charts -->
+<div class="charts-grid">
+
+  <div class="chart-card full">
+    <h3>📈 Activité quotidienne — 30 derniers jours</h3>
+    <div class="chart-wrap tall"><canvas id="dailyChart"></canvas></div>
+  </div>
+
+  <div class="chart-card">
+    <h3>🌐 Répartition par langue</h3>
+    <div class="chart-wrap short"><canvas id="langChart"></canvas></div>
+  </div>
+
+  <div class="chart-card">
+    <h3>🌱 Top cultures demandées</h3>
+    <div class="chart-wrap short" id="cropsWrap"><canvas id="cropsChart"></canvas></div>
+  </div>
+
+  <div class="chart-card full">
+    <h3>📍 Top villes</h3>
+    <div class="chart-wrap medium" id="citiesWrap"><canvas id="citiesChart"></canvas></div>
+  </div>
+
+</div>
+
+<script>
+  const GREEN      = '#2e7d32';
+  const GREEN_PALE = 'rgba(46,125,50,.12)';
+  const GREEN_MID  = '#66bb6a';
+  const AMBER      = '#f59e0b';
+  const AMBER_PALE = 'rgba(245,158,11,.15)';
+  const BLUE       = '#3b82f6';
+  const COLORS     = [GREEN, BLUE, AMBER, '#8b5cf6', '#ec4899', '#14b8a6',
+                      '#f97316', '#6366f1', '#a3e635', '#06b6d4'];
+
+  const fmtDate = s => {
+    const [, m, d] = s.split('-');
+    return `${d}/${m}`;
+  };
+
+  async function loadAnalytics() {
+    const res = await fetch('/analytics/data');
+    const d = await res.json();
+
+    document.getElementById('lastUpdated').textContent =
+      'Mis à jour : ' + new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+
+    // ── KPIs ──────────────────────────────────────────────────────────────
+    const langLabel = d.by_lang.length
+      ? d.by_lang.map(r => `${r.lang === 'ar' ? '🇲🇦' : '🇫🇷'} ${r.lang === 'ar' ? d.arabic_pct : d.french_pct}%`).join(' / ')
+      : '—';
+
+    document.getElementById('kpiRow').innerHTML = `
+      <div class="kpi">
+        <div class="kpi-val">${d.total}</div>
+        <div class="kpi-label">Consultations totales</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-val">${d.last_24h}</div>
+        <div class="kpi-label">Dernières 24 h</div>
+        <div class="kpi-sub">sur les 30 derniers jours</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-val">${d.nasa_success_rate}%</div>
+        <div class="kpi-label">Taux succès NASA</div>
+        <div class="kpi-sub">données météo disponibles</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-val">${d.arabic_pct}% / ${d.french_pct}%</div>
+        <div class="kpi-label">Arabe / Français</div>
+        <div class="kpi-sub">répartition des langues</div>
+      </div>
+    `;
+
+    // ── Daily activity line chart ─────────────────────────────────────────
+    new Chart(document.getElementById('dailyChart'), {
+      type: 'line',
+      data: {
+        labels: d.daily.map(r => fmtDate(r.day)),
+        datasets: [{
+          label: 'Consultations',
+          data: d.daily.map(r => r.cnt),
+          borderColor: GREEN,
+          backgroundColor: GREEN_PALE,
+          borderWidth: 2,
+          tension: 0.4,
+          fill: true,
+          pointRadius: r => r.raw > 0 ? 3 : 0,
+          pointBackgroundColor: GREEN,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false },
+          tooltip: { callbacks: { title: ctx => d.daily[ctx[0].dataIndex].day } }
+        },
+        scales: {
+          y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 },
+               grid: { color: '#f0f0f0' } },
+          x: { ticks: { maxTicksLimit: 15, maxRotation: 0 },
+               grid: { display: false } }
+        }
+      }
+    });
+
+    // ── Language doughnut ─────────────────────────────────────────────────
+    if (d.by_lang.length) {
+      new Chart(document.getElementById('langChart'), {
+        type: 'doughnut',
+        data: {
+          labels: d.by_lang.map(r => r.lang === 'ar' ? '🇲🇦 Darija / Arabe' : '🇫🇷 Français'),
+          datasets: [{
+            data: d.by_lang.map(r => r.cnt),
+            backgroundColor: [GREEN, BLUE, AMBER],
+            borderWidth: 0,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '68%',
+          plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12 } }
+          }
+        }
+      });
+    } else {
+      document.getElementById('langChart').parentElement.innerHTML =
+        '<div class="empty-chart">Pas encore de données</div>';
+    }
+
+    // ── Top crops horizontal bar ──────────────────────────────────────────
+    if (d.top_crops.length) {
+      document.getElementById('cropsWrap').style.height =
+        Math.max(160, d.top_crops.length * 26) + 'px';
+      new Chart(document.getElementById('cropsChart'), {
+        type: 'bar',
+        data: {
+          labels: d.top_crops.map(r => r.crop),
+          datasets: [{
+            data: d.top_crops.map(r => r.cnt),
+            backgroundColor: d.top_crops.map((_, i) => COLORS[i % COLORS.length]),
+            borderRadius: 4,
+            borderSkipped: false,
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 },
+                 grid: { color: '#f5f5f5' } },
+            y: { grid: { display: false } }
+          }
+        }
+      });
+    } else {
+      document.getElementById('cropsWrap').innerHTML =
+        '<div class="empty-chart">Pas encore de données</div>';
+    }
+
+    // ── Top cities bar ────────────────────────────────────────────────────
+    if (d.top_cities.length) {
+      document.getElementById('citiesWrap').style.height =
+        Math.max(180, d.top_cities.length * 28) + 'px';
+      new Chart(document.getElementById('citiesChart'), {
+        type: 'bar',
+        data: {
+          labels: d.top_cities.map(r => r.city),
+          datasets: [{
+            data: d.top_cities.map(r => r.cnt),
+            backgroundColor: AMBER,
+            borderRadius: 5,
+            borderSkipped: false,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 },
+                 grid: { color: '#f5f5f5' } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+    } else {
+      document.getElementById('citiesWrap').innerHTML =
+        '<div class="empty-chart">Pas encore de données</div>';
+    }
+  }
+
+  loadAnalytics();
+</script>
+
+</body>
+</html>
