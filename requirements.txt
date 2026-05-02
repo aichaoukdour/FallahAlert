@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+google-genai
+requests
+jinja2
+psycopg2-binary
+pgvector
