@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FellahAlert — Conseiller Agricole IA</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🌾 FellahAlert</h1>
+    <p>Système de conseil agricole IA pour les agriculteurs marocains</p>
+  </div>
+  <div style="display:flex;align-items:center;gap:1rem;">
+    <span class="tagline">Gemini AI · NASA POWER · PostgreSQL</span>
+    <a href="/analytics" class="analytics-link">📊 Analytics</a>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- LEFT: SMS Phone Simulator -->
+  <div style="display:flex;flex-direction:column;align-items:center;">
+    <div class="phone-card">
+      <div class="phone-header">
+        <div class="phone-avatar">👨‍🌾</div>
+        <div>
+          <h3>FellahAlert</h3>
+          <small>Conseiller agricole • En ligne</small>
+        </div>
+      </div>
+
+      <div class="chat-window" id="chatWindow">
+        <div class="bubble system">
+          Bienvenue! Tapez votre culture et ville — en français ou en arabe 🇲🇦<br/>
+          Ex: <strong>blé, Meknès</strong> &nbsp;|&nbsp; <strong>قمح، فاس</strong>
+        </div>
+      </div>
+
+      <div class="input-area">
+        <input
+          type="tel"
+          id="phoneInput"
+          class="phone-input"
+          placeholder="Numéro de téléphone (ex: 0612345678)"
+          value="0612345678"
+        />
+        <div class="input-row">
+          <input
+            type="text"
+            id="messageInput"
+            placeholder="Ex: blé, Meknès  |  قمح، مكناس"
+            autocomplete="off"
+            dir="auto"
+          />
+          <button class="send-btn" onclick="sendMessage()" title="Envoyer">
+            ➤
+          </button>
+        </div>
+        <div class="hint-row">
+          <span class="hint">Format: [culture], [ville] — français ou عربية</span>
+          <span class="lang-badge" id="langBadge"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Stats Panel -->
+  <div class="stats-panel">
+
+    <div class="card">
+      <h3>Statut des services</h3>
+      <div class="status-row">
+        <div class="status-item">
+          <div class="dot" id="dotNasa"></div>
+          <span>NASA POWER API</span>
+        </div>
+        <div class="status-item">
+          <div class="dot" id="dotGemini"></div>
+          <span>Gemini AI</span>
+        </div>
+        <div class="status-item">
+          <div class="dot green"></div>
+          <span>PostgreSQL</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Requêtes traitées</h3>
+      <div class="stat-number" id="totalQueries">—</div>
+      <div class="stat-label">consultations au total</div>
+      <div class="blocked-row" id="blockedRow" style="display:none;">
+        <span class="blocked-badge" id="blockedCount">0</span>
+        <span class="blocked-label">numéro(s) bloqué(s)</span>
+      </div>
+    </div>
+
+    <!-- Calendar card (server-side rendered, JS updates on city change) -->
+    <div class="card cal-card" id="calCard">
+      <div class="cal-header">
+        <div>
+          <span class="cal-month" id="calMonth">{{ cal.month_name_fr }}</span>
+          <span class="cal-region-badge" id="calRegion">{{ cal.region_label_fr }}</span>
+        </div>
+        <span class="cal-icon">🗓️</span>
+      </div>
+      <div id="calBody" class="cal-body">
+        {% if cal.alert %}
+        <div class="cal-alert">⚠️ {{ cal.alert }}</div>
+        {% endif %}
+        {% if cal.plant %}
+        <div class="cal-section">
+          <div class="cal-section-title">🌱 À semer</div>
+          <div class="cal-chips">
+            {% for c in cal.plant %}<span class="cal-chip plant">{{ c }}</span>{% endfor %}
+          </div>
+        </div>
+        {% endif %}
+        {% if cal.harvest %}
+        <div class="cal-section">
+          <div class="cal-section-title">🌾 À récolter</div>
+          <div class="cal-chips">
+            {% for c in cal.harvest %}<span class="cal-chip harvest">{{ c }}</span>{% endfor %}
+          </div>
+        </div>
+        {% endif %}
+        {% if cal.tasks %}
+        <div class="cal-section">
+          <div class="cal-section-title">📋 Tâches du mois</div>
+          <ul class="cal-tasks">
+            {% for t in cal.tasks %}<li>{{ t }}</li>{% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- WhatsApp integration status -->
+    <div class="card" id="waCard">
+      <h3>WhatsApp Business</h3>
+      <div class="wa-body" id="waBody">
+        <div class="status-item">
+          <div class="dot" id="dotWa"></div>
+          <span id="waLabel">Chargement…</span>
+        </div>
+        <div id="waSetupGuide" style="display:none;margin-top:.75rem;">
+          <p style="font-size:.78rem;color:var(--muted);margin:0 0 .5rem;">Pour activer WhatsApp :</p>
+          <ol style="font-size:.78rem;color:var(--muted);margin:0;padding-left:1.2rem;line-height:1.8;">
+            <li>Ouvrez <strong>Secrets</strong> dans Replit</li>
+            <li>Ajoutez <code>WHATSAPP_ACCESS_TOKEN</code></li>
+            <li>Ajoutez <code>WHATSAPP_PHONE_ID</code></li>
+            <li>Ajoutez <code>WHATSAPP_VERIFY_TOKEN</code> (votre token secret)</li>
+            <li>Redémarrez l'application</li>
+            <li>Webhook URL : <code id="waWebhookUrl"></code></li>
+          </ol>
+        </div>
+        <div id="waActiveInfo" style="display:none;margin-top:.5rem;">
+          <p style="font-size:.78rem;color:var(--muted);margin:0;">Répond aux messages texte et images 📸</p>
+          <p style="font-size:.78rem;color:var(--muted);margin:.25rem 0 0;">Webhook : <code id="waWebhookUrlActive"></code></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="flex:1;">
+      <h3>Dernières interactions</h3>
+      <div class="interactions-list" id="interactionsList">
+        <div class="empty-state">Aucune interaction pour l'instant</div>
+      </div>
+      <button class="refresh-btn" onclick="loadStats()">↻ Actualiser</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  function maskPhone(phone) {
+    if (!phone) return '—';
+    const s = String(phone);
+    if (s.length <= 4) return '****';
+    return s.slice(0, 3) + '****' + s.slice(-2);
+  }
+
+  function now() {
+    return new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function scrollToBottom() {
+    const w = document.getElementById('chatWindow');
+    w.scrollTop = w.scrollHeight;
+  }
+
+  function addBubble(text, type, time, lang) {
+    const w = document.getElementById('chatWindow');
+    const div = document.createElement('div');
+    div.className = `bubble ${type}`;
+    const isArabic = lang === 'ar' || type === 'bot' && /[\u0600-\u06FF]/.test(text);
+    if (type === 'bot' && isArabic) {
+      div.setAttribute('dir', 'rtl');
+    }
+    if (type === 'farmer' && isArabic) {
+      div.setAttribute('dir', 'rtl');
+    }
+    div.innerHTML = `${escapeHtml(text)}<div class="bubble-meta">${time || now()}</div>`;
+    w.appendChild(div);
+    scrollToBottom();
+    return div;
+  }
+
+  function addSpinner() {
+    const w = document.getElementById('chatWindow');
+    const div = document.createElement('div');
+    div.className = 'spinner';
+    div.id = 'typingSpinner';
+    div.innerHTML = '<span></span><span></span><span></span>';
+    w.appendChild(div);
+    scrollToBottom();
+  }
+
+  function removeSpinner() {
+    const s = document.getElementById('typingSpinner');
+    if (s) s.remove();
+  }
+
+  function escapeHtml(text) {
+    return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Live language detection in input
+  const msgInput = document.getElementById('messageInput');
+  const langBadge = document.getElementById('langBadge');
+  msgInput.addEventListener('input', () => {
+    const val = msgInput.value;
+    const arabicChars = (val.match(/[\u0600-\u06FF]/g) || []).length;
+    const ratio = val.length > 0 ? arabicChars / val.replace(/\s/g, '').length : 0;
+    if (ratio > 0.2) {
+      langBadge.textContent = '🇲🇦 عربية';
+      langBadge.className = 'lang-badge ar';
+    } else if (val.length > 2) {
+      langBadge.textContent = '🇫🇷 Français';
+      langBadge.className = 'lang-badge fr';
+    } else {
+      langBadge.textContent = '';
+      langBadge.className = 'lang-badge';
+    }
+  });
+
+  async function sendMessage() {
+    const phone = document.getElementById('phoneInput').value.trim() || '0600000000';
+    const msg = msgInput.value.trim();
+    if (!msg) return;
+
+    const isArabicMsg = (msg.match(/[\u0600-\u06FF]/g) || []).length / msg.replace(/\s/g,'').length > 0.2;
+    msgInput.value = '';
+    langBadge.textContent = '';
+    langBadge.className = 'lang-badge';
+
+    addBubble(msg, 'farmer', null, isArabicMsg ? 'ar' : 'fr');
+    addSpinner();
+
+    try {
+      const res = await fetch('/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone, message: msg }),
+      });
+      const data = await res.json();
+      removeSpinner();
+
+      if (data.error) {
+        addBubble('⚠️ ' + data.error, 'system');
+      } else {
+        if (data.used_default_city) {
+          addBubble('Ville non reconnue — conseil basé sur Meknès.', 'system');
+        }
+        addBubble(data.response, 'bot', null, data.lang);
+        loadStats();
+        if (data.city) loadCalendar(data.city);
+      }
+    } catch (e) {
+      removeSpinner();
+      addBubble('Erreur de connexion. Réessayez.', 'system');
+    }
+  }
+
+  msgInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') sendMessage();
+  });
+
+  async function loadStats() {
+    try {
+      const res = await fetch('/stats');
+      const data = await res.json();
+      document.getElementById('totalQueries').textContent = data.total ?? '0';
+
+      const bc = data.blocked_count ?? 0;
+      const blockedRow = document.getElementById('blockedRow');
+      if (bc > 0) {
+        document.getElementById('blockedCount').textContent = bc;
+        blockedRow.style.display = 'flex';
+      } else {
+        blockedRow.style.display = 'none';
+      }
+
+      const list = document.getElementById('interactionsList');
+      if (!data.recent || data.recent.length === 0) {
+        list.innerHTML = '<div class="empty-state">Aucune interaction pour l\'instant</div>';
+        return;
+      }
+
+      list.innerHTML = data.recent.map(i => {
+        const langFlag = i.lang === 'ar' ? '🇲🇦' : '🇫🇷';
+        const preview = (i.ai_response || '').slice(0, 80);
+        const isAr = i.lang === 'ar';
+        return `
+          <div class="interaction-item">
+            <div class="row1">
+              <span class="crop-city">${langFlag} ${escapeHtml(i.crop || '—')} · ${escapeHtml(i.city || '—')}</span>
+              <span class="phone-masked">${maskPhone(i.phone)}</span>
+            </div>
+            <div class="preview" ${isAr ? 'dir="rtl"' : ''}>${escapeHtml(preview)}…</div>
+          </div>
+        `;
+      }).join('');
+    } catch(e) {}
+  }
+
+  async function loadStatus() {
+    try {
+      const res = await fetch('/status');
+      const data = await res.json();
+      document.getElementById('dotNasa').className = 'dot ' + (data.nasa ? 'green' : 'red');
+      document.getElementById('dotGemini').className = 'dot ' + (data.gemini ? 'green' : 'red');
+    } catch(e) {}
+  }
+
+  // ── Crop Calendar ─────────────────────────────────────────────
+  let calCity = 'meknès';
+
+  async function loadCalendar(city) {
+    calCity = city || calCity;
+    try {
+      const res = await fetch(`/calendar?city=${encodeURIComponent(calCity)}`);
+      const d = await res.json();
+      document.getElementById('calMonth').textContent = d.month_name_fr;
+      document.getElementById('calRegion').textContent = d.region_label_fr;
+
+      let html = '';
+
+      if (d.alert) {
+        html += `<div class="cal-alert">⚠️ ${escapeHtml(d.alert)}</div>`;
+      }
+
+      if (d.plant.length) {
+        html += `<div class="cal-section">
+          <div class="cal-section-title">🌱 À semer</div>
+          <div class="cal-chips">${d.plant.map(c => `<span class="cal-chip plant">${escapeHtml(c)}</span>`).join('')}</div>
+        </div>`;
+      }
+
+      if (d.harvest.length) {
+        html += `<div class="cal-section">
+          <div class="cal-section-title">🌾 À récolter</div>
+          <div class="cal-chips">${d.harvest.map(c => `<span class="cal-chip harvest">${escapeHtml(c)}</span>`).join('')}</div>
+        </div>`;
+      }
+
+      if (d.tasks.length) {
+        html += `<div class="cal-section">
+          <div class="cal-section-title">📋 Tâches du mois</div>
+          <ul class="cal-tasks">${d.tasks.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>
+        </div>`;
+      }
+
+      if (!html) html = '<div class="empty-state">Pas de données pour ce mois.</div>';
+      document.getElementById('calBody').innerHTML = html;
+    } catch(e) {
+      document.getElementById('calBody').innerHTML = '<div class="empty-state">Erreur de chargement.</div>';
+    }
+  }
+
+  async function loadWhatsAppStatus() {
+    try {
+      const res = await fetch('/whatsapp/status');
+      const d = await res.json();
+      const dot = document.getElementById('dotWa');
+      const label = document.getElementById('waLabel');
+      const baseUrl = window.location.origin;
+      const webhookPath = '/whatsapp';
+
+      if (d.enabled) {
+        dot.className = 'dot green';
+        label.textContent = 'Connecté et actif';
+        document.getElementById('waActiveInfo').style.display = 'block';
+        document.getElementById('waWebhookUrlActive').textContent = baseUrl + webhookPath;
+      } else {
+        dot.className = 'dot yellow';
+        label.textContent = 'Non configuré';
+        document.getElementById('waSetupGuide').style.display = 'block';
+        document.getElementById('waWebhookUrl').textContent = baseUrl + webhookPath;
+      }
+    } catch(e) {
+      document.getElementById('dotWa').className = 'dot red';
+      document.getElementById('waLabel').textContent = 'Erreur de statut';
+    }
+  }
+
+  loadStats();
+  loadStatus();
+  loadCalendar();
+  loadWhatsAppStatus();
+  setInterval(loadStatus, 30000);
+</script>
+
+</body>
+</html>
